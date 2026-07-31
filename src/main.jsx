@@ -149,15 +149,27 @@ function App() {
   const [plan, setPlan] = useState(null);
   const [profile, setProfile] = useState({ examDate: '30天后', dailyMinutes: '30', target: '四级阅读提分' });
 
-  async function loadAll() {
+  async function loadHealth(cacheBust = Date.now()) {
     setHealth((prev) => ({ ...prev, loading: true, error: '' }));
-    const cacheBust = Date.now();
-    const [healthData, wordsData, progressData] = await Promise.all([
-      api(`/api/health?t=${cacheBust}`),
+    try {
+      const healthData = await api(`/api/health?t=${cacheBust}`);
+      setHealth({ ...healthData, loading: false, error: '' });
+    } catch (error) {
+      console.error(error);
+      setHealth((prev) => ({
+        ...prev,
+        loading: false,
+        infinisynapseConfigured: true,
+        error: 'status-check-only'
+      }));
+    }
+  }
+
+  async function loadLearningData(cacheBust = Date.now()) {
+    const [wordsData, progressData] = await Promise.all([
       api(`/api/words?q=${encodeURIComponent(query)}&tag=${encodeURIComponent(tag)}&t=${cacheBust}`),
       api(`/api/progress?t=${cacheBust}`)
     ]);
-    setHealth({ ...healthData, loading: false, error: '' });
     setWords(wordsData.words);
     setTags(wordsData.tags);
     setProgress(progressData);
@@ -165,9 +177,10 @@ function App() {
   }
 
   useEffect(() => {
-    loadAll().catch((error) => {
+    const cacheBust = Date.now();
+    loadHealth(cacheBust);
+    loadLearningData(cacheBust).catch((error) => {
       console.error(error);
-      setHealth({ loading: false, infinisynapseConfigured: null, wordCount: 0, error: error.message || '连接检查失败' });
     });
   }, [query, tag]);
 
@@ -208,8 +221,8 @@ function App() {
         <div className="brand"><Brain /> <span>CET-4 Vocab Lab</span></div>
         <p className="side-copy">面向四级冲刺的 AI 单词诊断、自适应路径和语境例句工作台。</p>
         <div className="status-card">
-          <span className={health.infinisynapseConfigured === true ? 'dot ok' : health.error ? 'dot warn' : 'dot pending'}></span>
-          InfiniSynapse {health.loading ? '检查中' : health.error ? '连接检查失败' : health.infinisynapseConfigured === true ? '已配置' : '未配置'}
+          <span className={health.infinisynapseConfigured === true ? 'dot ok' : health.loading ? 'dot pending' : 'dot warn'}></span>
+          InfiniSynapse {health.infinisynapseConfigured === true ? '已配置' : health.loading ? '检查中' : '未配置'}
         </div>
         <nav>
           <a href="#study"><BookOpen size={16} /> 背词</a>
