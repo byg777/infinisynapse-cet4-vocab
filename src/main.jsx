@@ -1,9 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BarChart3, BookOpen, Brain, Check, ChevronRight, Clock, RefreshCcw, Search, Sparkles, Target, X } from 'lucide-react';
+import { fallbackTags, fallbackWords } from './fallbackWords.js';
 import './styles.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
+
+function filterFallbackWords(query, tag) {
+  const q = String(query || '').trim().toLowerCase();
+  return fallbackWords.filter((item) => {
+    const matchesQ = !q || item.word.includes(q) || item.meaning.includes(q);
+    const matchesTag = !tag || item.tag === tag;
+    return matchesQ && matchesTag;
+  });
+}
 
 async function api(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -136,9 +146,9 @@ const defaultDays = [
 ];
 
 function App() {
-  const [health, setHealth] = useState({ loading: true, infinisynapseConfigured: null, wordCount: 0 });
-  const [words, setWords] = useState([]);
-  const [tags, setTags] = useState([]);
+  const [health, setHealth] = useState({ loading: true, infinisynapseConfigured: null, wordCount: fallbackWords.length });
+  const [words, setWords] = useState(fallbackWords);
+  const [tags, setTags] = useState(fallbackTags);
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState('');
   const [progress, setProgress] = useState(null);
@@ -166,14 +176,26 @@ function App() {
   }
 
   async function loadLearningData(cacheBust = Date.now()) {
-    const [wordsData, progressData] = await Promise.all([
-      api(`/api/words?q=${encodeURIComponent(query)}&tag=${encodeURIComponent(tag)}&t=${cacheBust}`),
-      api(`/api/progress?t=${cacheBust}`)
-    ]);
-    setWords(wordsData.words);
-    setTags(wordsData.tags);
-    setProgress(progressData);
-    setIndex(0);
+    try {
+      const [wordsData, progressData] = await Promise.all([
+        api(`/api/words?q=${encodeURIComponent(query)}&tag=${encodeURIComponent(tag)}&t=${cacheBust}`),
+        api(`/api/progress?t=${cacheBust}`)
+      ]);
+      setWords(wordsData.words?.length ? wordsData.words : filterFallbackWords(query, tag));
+      setTags(wordsData.tags?.length ? wordsData.tags : fallbackTags);
+      setProgress(progressData);
+      setIndex(0);
+    } catch (error) {
+      console.error(error);
+      setWords(filterFallbackWords(query, tag));
+      setTags(fallbackTags);
+      setProgress((prev) => prev || {
+        stats: { totalReviews: 0, accuracy: 0, mastered: 0, weak: 0, byWord: [] },
+        reviews: [],
+        recommendations: filterFallbackWords('', '').slice(0, 10)
+      });
+      setIndex(0);
+    }
   }
 
   useEffect(() => {
