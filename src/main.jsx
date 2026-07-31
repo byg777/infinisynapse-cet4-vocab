@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BarChart3, BookOpen, Brain, Check, ChevronRight, Clock, RefreshCcw, Search, Sparkles, Target, X } from 'lucide-react';
 import './styles.css';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5174';
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 async function api(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
